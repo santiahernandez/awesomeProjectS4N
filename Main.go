@@ -1,11 +1,9 @@
 package main
 
-import(
-	controller "awesomeProjectS4N/controller"
-	"math/rand"
+import (
+	"awesomeProjectS4N/controller"
 )
 
-func main()  {
-	rand.ExpFloat64()
-	controller.
+func main() {
+	controller.Controller()
 }
