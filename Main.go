@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	controller.Controller()
+	controller.HandleRequest()
 }
