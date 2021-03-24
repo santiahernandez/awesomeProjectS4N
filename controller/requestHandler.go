@@ -7,10 +7,6 @@ import (
 	"net/http"
 )
 
-func apiStatus(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Classroom management ms working")
-}
-
 func HandleRequest() {
 	myRouter := mux.NewRouter().StrictSlash(true)
 	//test

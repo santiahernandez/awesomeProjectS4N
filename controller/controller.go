@@ -7,7 +7,6 @@ import (
 	_ "github.com/lib/pq"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -17,9 +16,9 @@ var collection *mongo.Collection
 var ctx = context.TODO()
 var uri = os.Getenv("DB_CONN")
 
-func createUser(w http.ResponseWriter, r *http.Request) {
-	clientOptions := options.Client().ApplyURI(uri)
-	client, err := mongo.Connect(ctx, clientOptions)
+func apiStatus(w http.ResponseWriter, r *http.Request) {
+	clientOptions := options.Client().ApplyURI(uri) // Connect to //MongoDB
+	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,17 +26,32 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var users User
-	collection := client.Database("UsersDB").Collection("user")
-	reqBody, _ := ioutil.ReadAll(r.Body)
-	err = json.Unmarshal(reqBody, &users)
+	fmt.Println("Connected to MongoDB!")
+}
+
+func createUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	clientOptions := options.Client().ApplyURI(uri)
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Fatal(err)
 	}
+
+	var users User
+
+	collection := client.Database("Test").Collection("user")
+
+	err = json.NewDecoder(r.Body).Decode(&users)
+	if err != nil {
+		fmt.Print(err)
+	}
+
 	insertResult, err := collection.InsertOne(ctx, users)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Inserted a single user: ", insertResult.InsertedID)
-	fmt.Fprint(w, "Inserted a single user: ", insertResult.InsertedID)
+
+	json.NewEncoder(w).Encode(insertResult.InsertedID)
 }
