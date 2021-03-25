@@ -15,6 +15,14 @@ func HandleRequest() {
 	//basic crud
 	myRouter.HandleFunc("/", createUser).Methods("POST")
 
+	myRouter.HandleFunc("/all", getUsers).Methods("GET")
+
+	myRouter.HandleFunc("/id/{id}", getUserById).Methods("GET")
+
+	myRouter.HandleFunc("/name/{name}", getUserByName).Methods("GET")
+
+	myRouter.HandleFunc("/id/{id}", deleteUserById).Methods("DELETE")
+
 	fmt.Println("Port 8080 is listening")
 	log.Fatal(http.ListenAndServe(":8080", myRouter))
 
