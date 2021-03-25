@@ -4,14 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 var ctx = context.TODO()
@@ -30,7 +34,13 @@ func apiStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Connected to MongoDB!")
 	}
 }
-
+func getHash(pwd []byte) string {
+	hash, err := bcrypt.GenerateFromPassword(pwd, bcrypt.MinCost)
+	if err != nil {
+		log.Println(err)
+	}
+	return string(hash)
+}
 func createUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -48,7 +58,7 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	user.Password = getHash([]byte(user.Password))
 	insertResult, err := collection.InsertOne(ctx, user)
 	if err != nil {
 		log.Panic(err)
@@ -157,6 +167,8 @@ func getUserByName(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteUserById(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
 	clientOptions := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
@@ -177,5 +189,78 @@ func deleteUserById(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "Succesfully deleted user with id %s", thisId)
 
 		}
+	}
+}
+
+func updateNamebyID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	clientOptions := options.Client().ApplyURI(uri)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Panic(err)
+	}
+	vars := mux.Vars(r)
+	thisId := vars["id"]
+	thisName := vars["name"]
+	filter := bson.M{"_id": thisId}
+	collection := client.Database("Test").Collection("user")
+
+	after := options.After // for returning updated document
+	returnOpt := options.FindOneAndUpdateOptions{
+		ReturnDocument: &after,
+	}
+	update := bson.D{{"$set", bson.D{{"name", thisName}}}}
+
+	updateResult := collection.FindOneAndUpdate(context.TODO(), filter, update, &returnOpt)
+	var result primitive.M
+	updateResult.Decode(&result)
+	json.NewEncoder(w).Encode(result)
+}
+func GenerateJWT(id string) (string, error) {
+	var err error
+	secret := os.Getenv("SECRETKEY")
+	atClaims := jwt.MapClaims{}
+	atClaims["authorized"] = true
+	atClaims["user_id"] = id
+	atClaims["exp"] = time.Now().Add(time.Minute * 30).Unix()
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
+	token, err := at.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func userLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	clientOptions := options.Client().ApplyURI(uri)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Panic(err)
+	}
+	vars := mux.Vars(r)
+	thisId := vars["id"]
+	thisPassword := vars["password"]
+	filter := bson.M{"_id": thisId}
+	collection := client.Database("Test").Collection("user")
+	var userInDB User
+	err = collection.FindOne(ctx, filter).Decode(&userInDB)
+	if err != nil {
+		log.Panic(err)
+		fmt.Fprintf(w, "error retrieving user userid : %s", thisId)
+	} else {
+		passwordDB := userInDB.Password
+		err := bcrypt.CompareHashAndPassword([]byte(passwordDB), []byte(thisPassword))
+		if err != nil {
+			fmt.Fprint(w, "Wrong password try again")
+		} else {
+			jwtToken, err := GenerateJWT(userInDB.LegalId)
+			if err != nil {
+				fmt.Fprint(w, "There was an error creating the token, please try again")
+			} else {
+				json.NewEncoder(w).Encode(jwtToken)
+			}
+		}
+
 	}
 }

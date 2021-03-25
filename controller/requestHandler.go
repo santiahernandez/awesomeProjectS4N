@@ -23,6 +23,10 @@ func HandleRequest() {
 
 	myRouter.HandleFunc("/id/{id}", deleteUserById).Methods("DELETE")
 
+	myRouter.HandleFunc("/id/{id}/name/{name}", updateNamebyID).Methods("PATCH")
+
+	myRouter.HandleFunc("/login/{id}/{password}", userLogin).Methods("GET")
+
 	fmt.Println("Port 8080 is listening")
 	log.Fatal(http.ListenAndServe(":8080", myRouter))
 
