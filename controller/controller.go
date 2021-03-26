@@ -174,21 +174,26 @@ func deleteUserById(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Panic(err)
 	}
-	vars := mux.Vars(r)
-	thisId := vars["id"]
 
-	filter := bson.M{"_id": thisId}
-	collection := client.Database("Test").Collection("user")
-	res, err := collection.DeleteOne(ctx, filter)
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		if res.DeletedCount == 0 {
-			fmt.Fprint(w, "No data found")
+	token := r.Header.Get("jwtToken")
+	if validateToken(token) {
+		vars := mux.Vars(r)
+		thisId := vars["id"]
+		filter := bson.M{"_id": thisId}
+		collection := client.Database("Test").Collection("user")
+		res, err := collection.DeleteOne(ctx, filter)
+		if err != nil {
+			log.Fatal(err)
 		} else {
-			fmt.Fprintf(w, "Succesfully deleted user with id %s", thisId)
+			if res.DeletedCount == 0 {
+				fmt.Fprint(w, "No data found")
+			} else {
+				fmt.Fprintf(w, "Succesfully deleted user with id %s", thisId)
 
+			}
 		}
+	} else {
+		fmt.Fprintf(w, "Not credentials to delete")
 	}
 }
 
@@ -261,6 +266,17 @@ func userLogin(w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(jwtToken)
 			}
 		}
-
 	}
+}
+
+func validateToken(signedToken string) bool {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(signedToken, &claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRETKEY")), nil
+	})
+	// ... error handling
+	if err != nil {
+		fmt.Println(err)
+	}
+	return token.Valid
 }
